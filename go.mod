@@ -1,4 +1,4 @@
-module github.com/miabi-io/agent
+module github.com/miabi-io/miabi-agent
 
 go 1.25.0
 
