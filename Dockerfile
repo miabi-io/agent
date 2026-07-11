@@ -19,7 +19,7 @@ LABEL org.opencontainers.image.title="Miabi Agent" \
       org.opencontainers.image.url="https://github.com/miabi-io/agent" \
       org.opencontainers.image.source="https://github.com/miabi-io/agent" \
       org.opencontainers.image.documentation="https://github.com/miabi-io/agent#readme" \
-      org.opencontainers.image.licenses="Apache-2.0"
+      org.opencontainers.image.licenses="AGPL-3.0-or-later"
 RUN apk add --no-cache ca-certificates && adduser -D -u 10001 agent
 COPY --from=build /miabi-agent /usr/local/bin/miabi-agent
 # Note: reaching /var/run/docker.sock typically requires the host's docker group
