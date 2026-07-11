@@ -67,4 +67,6 @@ page if leaked.
 
 ## License
 
-Apache-2.0 — see [LICENSE](./LICENSE).
+AGPL-3.0-or-later — see [LICENSE](./LICENSE). A commercial license is available
+for uses that don't fit the AGPL; see the [Miabi](https://github.com/miabi-io/miabi)
+project's licensing.
