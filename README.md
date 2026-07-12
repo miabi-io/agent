@@ -24,7 +24,7 @@ tunnel; the agent just copies bytes between each tunnel stream and the socket.
 
 | Variable                | Required | Default                        | Description |
 |-------------------------|----------|--------------------------------|-------------|
-| `MIABI_CONTROL_URL` | yes      | —                              | Control plane base URL, e.g. `https://panel.example.com` |
+| `MIABI_CONTROL_URL` | yes      | —                              | Control plane base URL, e.g. `https://miabi.example.com` |
 | `MIABI_NODE_TOKEN`  | yes      | —                              | Join token shown once when the node was added (`mbn_…`) |
 | `DOCKER_HOST`           | no       | `unix:///var/run/docker.sock`  | Local Docker endpoint |
 
@@ -32,22 +32,38 @@ The control plane reconnect is automatic with exponential backoff.
 
 ## Run
 
+### Install script
+
+Checks that Docker is present and running (it does not install Docker), then starts the
+agent and verifies it stayed up:
+
+```sh
+curl -fsSL https://get.miabi.io/agent | \
+  MIABI_CONTROL_URL=https://miabi.example.com MIABI_NODE_TOKEN=mbn_xxxxxxxx bash
+```
+
 ### Docker
 
 ```sh
 docker run -d --name miabi-agent --restart unless-stopped \
-  -e MIABI_CONTROL_URL=https://panel.example.com \
+  -e MIABI_CONTROL_URL=https://miabi.example.com \
   -e MIABI_NODE_TOKEN=mbn_xxxxxxxx \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  ghcr.io/miabi-io/agent:latest
+  miabi/agent:latest
 ```
 
 ### Binary
 
+Via environment, or the equivalent flags (`--control-url`, `--token`, `--insecure`) — each flag
+defaults to its env var and wins when both are set:
+
 ```sh
-MIABI_CONTROL_URL=https://panel.example.com \
+MIABI_CONTROL_URL=https://miabi.example.com \
 MIABI_NODE_TOKEN=mbn_xxxxxxxx \
 ./miabi-agent
+
+# or
+./miabi-agent --control-url https://miabi.example.com --token mbn_xxxxxxxx
 ```
 
 ## Build

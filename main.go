@@ -6,17 +6,20 @@
 // stream to the local Docker socket. All orchestration logic stays on the
 // control plane; the agent is a thin, dumb Docker proxy with no DB/Redis access.
 //
-// Configuration (environment):
+// Configuration is read from flags, each defaulting to an environment variable so
+// the container form (env) and the binary form (flags) are interchangeable; a
+// flag wins when both are given.
 //
-//	MIABI_CONTROL_URL                 control plane base URL, e.g. https://panel.example.com
-//	                                      (falls back to MIABI_API_URL)
-//	MIABI_NODE_TOKEN                  join token issued when the node was added (mbn_...)
-//	DOCKER_HOST                           local Docker endpoint (default unix:///var/run/docker.sock)
-//	MIABI_AGENT_INSECURE_SKIP_VERIFY  skip TLS verification of the control plane (default false)
+//	--control-url  / MIABI_CONTROL_URL                 control plane base URL, e.g. https://miabi.example.com
+//	                                                       (env falls back to MIABI_API_URL)
+//	--token        / MIABI_NODE_TOKEN                  join token issued when the node was added (mbn_...)
+//	--insecure     / MIABI_AGENT_INSECURE_SKIP_VERIFY  skip TLS verification of the control plane (default false)
+//	                 DOCKER_HOST                       local Docker endpoint (default unix:///var/run/docker.sock)
 package main
 
 import (
 	"context"
+	"flag"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -29,10 +32,13 @@ import (
 var version = "dev"
 
 func main() {
-	controlURL := strings.TrimRight(goutils.Env("MIABI_CONTROL_URL", goutils.Env("MIABI_API_URL", "")), "/")
-	token := goutils.Env("MIABI_NODE_TOKEN", "")
+
+	controlURL := flag.String("control-url", goutils.Env("MIABI_CONTROL_URL", goutils.Env("MIABI_API_URL", "")), "control plane base URL, e.g. https://miabi.example.com (env MIABI_CONTROL_URL)")
+	token := flag.String("token", goutils.Env("MIABI_NODE_TOKEN", ""), "node join token, mbn_... (env MIABI_NODE_TOKEN)")
+	insecure := flag.Bool("insecure", goutils.EnvBool("MIABI_AGENT_INSECURE_SKIP_VERIFY", false), "skip TLS verification of the control plane (env MIABI_AGENT_INSECURE_SKIP_VERIFY)")
+	flag.Parse()
+
 	dockerHost := goutils.Env("DOCKER_HOST", "unix:///var/run/docker.sock")
-	insecure := goutils.EnvBool("MIABI_AGENT_INSECURE_SKIP_VERIFY", false)
 	if goutils.EnvBool("MIABI_DEV_MODE", false) {
 		logger.New(logger.WithDebugLevel())
 	} else {
@@ -40,15 +46,15 @@ func main() {
 	}
 
 	cfg := Config{
-		ControlURL:  controlURL,
-		Token:       token,
+		ControlURL:  strings.TrimRight(*controlURL, "/"),
+		Token:       *token,
 		DockerHost:  dockerHost,
-		Insecure:    insecure,
+		Insecure:    *insecure,
 		Version:     version,
 		ContainerID: selfContainerID(),
 	}
 	if cfg.ControlURL == "" || cfg.Token == "" {
-		logger.Fatal("MIABI_CONTROL_URL and MIABI_NODE_TOKEN are required")
+		logger.Fatal("control plane URL and node token are required (--control-url/--token or MIABI_CONTROL_URL/MIABI_NODE_TOKEN)")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
