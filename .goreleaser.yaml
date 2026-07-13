@@ -1,0 +1,91 @@
+# GoReleaser config for the Miabi node agent.
+#
+# The container image stays the primary way to run the agent (see Dockerfile and
+# install-agent.sh) — it is what the cluster-wide global service ships to every swarm
+# worker. These binaries are for the other case: running the agent as a host process
+# under systemd/launchd, on a node where you would rather not add a container to
+# supervise the containers.
+#
+# Release:  goreleaser release --clean   (on a tag)
+# Snapshot: goreleaser build --snapshot --clean
+version: 2
+
+project_name: miabi-agent
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: miabi-agent
+    main: .
+    binary: miabi-agent
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    # Linux and macOS only, and Windows is a deliberate omission rather than an
+    # oversight: the agent reaches Docker over `unix://` or `tcp://` (see dialDocker),
+    # and Windows serves its daemon on a named pipe (npipe://). A Windows binary would
+    # build cleanly and then fail to find Docker on every machine it ran on, which is
+    # worse than not shipping one.
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: miabi-agent
+    ids: [miabi-agent]
+    name_template: "miabi-agent_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-dev"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "Merge pull request"
+      - "Merge branch"
+
+release:
+  github:
+    owner: miabi-io
+    name: agent
+  prerelease: auto
+  name_template: "Miabi Agent {{ .Tag }}"
+  footer: |
+    ---
+
+    ## Container image
+
+    The agent is normally run as a container — that is what the installer and the
+    cluster-wide agent service use:
+
+        docker run -d --name miabi-agent --restart unless-stopped \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -e MIABI_CONTROL_URL=https://miabi.example.com \
+          -e MIABI_NODE_TOKEN=mbn_xxxxxxxx \
+          miabi/agent:{{ .Version }}
+
+    Images are published to Docker Hub (`miabi/agent`) and GHCR
+    (`ghcr.io/miabi-io/agent`), tagged `latest` and `{{ .Version }}`.
+
+    The binaries above are for running the agent directly on a host (systemd, launchd)
+    instead of in a container. They need the same two settings, plus a reachable Docker
+    socket — and, behind a private CA, `MIABI_CA_CERT`.
