@@ -35,7 +35,8 @@ func main() {
 
 	controlURL := flag.String("control-url", goutils.Env("MIABI_CONTROL_URL", goutils.Env("MIABI_API_URL", "")), "control plane base URL, e.g. https://miabi.example.com (env MIABI_CONTROL_URL)")
 	token := flag.String("token", goutils.Env("MIABI_NODE_TOKEN", ""), "node join token, mbn_... (env MIABI_NODE_TOKEN)")
-	insecure := flag.Bool("insecure", goutils.EnvBool("MIABI_AGENT_INSECURE_SKIP_VERIFY", false), "skip TLS verification of the control plane (env MIABI_AGENT_INSECURE_SKIP_VERIFY)")
+	insecure := flag.Bool("insecure", goutils.EnvBool("MIABI_AGENT_INSECURE_SKIP_VERIFY", false), "skip TLS verification of the control plane — last resort; prefer --ca-cert (env MIABI_AGENT_INSECURE_SKIP_VERIFY)")
+	caCert := flag.String("ca-cert", goutils.Env("MIABI_CA_CERT", ""), "PEM (or path to one) of the CA that signed the control plane's certificate; verification still happens, anchored on it (env MIABI_CA_CERT)")
 	flag.Parse()
 
 	dockerHost := goutils.Env("DOCKER_HOST", "unix:///var/run/docker.sock")
@@ -50,6 +51,7 @@ func main() {
 		Token:       *token,
 		DockerHost:  dockerHost,
 		Insecure:    *insecure,
+		CACert:      *caCert,
 		Version:     version,
 		ContainerID: selfContainerID(),
 	}

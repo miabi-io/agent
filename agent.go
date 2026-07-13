@@ -17,10 +17,12 @@ import (
 
 // Config configures the agent runtime.
 type Config struct {
-	ControlURL  string // e.g. https://panel.example.com
-	Token       string // join token (mbn_...)
-	DockerHost  string // e.g. unix:///var/run/docker.sock
-	Insecure    bool   // skip TLS verification of the control plane
+	ControlURL string // e.g. https://panel.example.com
+	Token      string // join token (mbn_...)
+	DockerHost string // e.g. unix:///var/run/docker.sock
+	Insecure   bool   // skip TLS verification of the control plane (last resort)
+	// CACert trusts a specific certificate authority for the control plane
+	CACert      string
 	Version     string // agent build version, reported to the control plane
 	ContainerID string // the agent's own container id, reported so it is protected from removal
 }
@@ -38,9 +40,21 @@ func Run(ctx context.Context, cfg Config) error {
 	if cfg.ContainerID != "" {
 		header.Set("X-Agent-Container-ID", cfg.ContainerID)
 	}
+
+	if id := identity(ctx, cfg.DockerHost); id.Hostname != "" || id.SwarmNodeID != "" {
+		if id.Hostname != "" {
+			header.Set("X-Agent-Hostname", id.Hostname)
+		}
+		if id.SwarmNodeID != "" {
+			header.Set("X-Agent-Swarm-Node-ID", id.SwarmNodeID)
+		}
+		logger.Info("node identity", "hostname", id.Hostname, "swarm_node_id", id.SwarmNodeID)
+	}
 	opts := wstunnel.ClientOptions{
-		URL:      wstunnel.URL(cfg.ControlURL, connectPath),
-		Header:   header,
+		URL:    wstunnel.URL(cfg.ControlURL, connectPath),
+		Header: header,
+
+		Dialer:   tlsDialer(cfg),
 		Insecure: cfg.Insecure,
 		OnConnect: func() {
 			logger.Info("connected to control plane", "control_url", cfg.ControlURL)
