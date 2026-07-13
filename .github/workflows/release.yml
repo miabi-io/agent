@@ -9,6 +9,32 @@ permissions:
   packages: write
 
 jobs:
+  # Downloadable binaries, for running the agent as a host process (systemd, launchd)
+  # rather than as a container. Linux and macOS only — the agent reaches Docker over a
+  # unix socket or TCP, and Windows serves its daemon on a named pipe, so a Windows
+  # build would run and then never find Docker.
+  binaries:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release and upload the archives
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history so the changelog can diff against prior tags
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   image:
     runs-on: ubuntu-latest
     steps:

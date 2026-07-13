@@ -1,3 +1,6 @@
 /miabi-agent
 /agent
 *.exe
+
+# GoReleaser build output
+/dist/
