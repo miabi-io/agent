@@ -62,6 +62,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// On an edge-gateway node the local Goma writes request events to the node's
+	// own Redis, which no dashboard reads. Drain them to the control plane.
+	go startForwarder(ctx, cfg)
+
 	logger.Info("miabi-agent starting", "version", version, "control_url", cfg.ControlURL)
 	if err := Run(ctx, cfg); err != nil && err != context.Canceled {
 		logger.Fatal("agent error", "error", err)
