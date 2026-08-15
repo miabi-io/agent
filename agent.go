@@ -12,7 +12,7 @@ import (
 
 	"github.com/hashicorp/yamux"
 	"github.com/jkaninda/logger"
-	"github.com/miabi-io/wstunnel"
+	"github.com/jkaninda/wstunnel"
 )
 
 // Config configures the agent runtime.
