@@ -1,14 +1,11 @@
 module github.com/miabi-io/agent
 
-go 1.25.0
-
-require (
-	github.com/gorilla/websocket v1.5.3
-	github.com/hashicorp/yamux v0.1.2
-)
+go 1.27.1
 
 require (
 	github.com/alicebob/miniredis/v2 v2.38.0
+	github.com/gorilla/websocket v1.5.3
+	github.com/hashicorp/yamux v0.1.2
 	github.com/jkaninda/go-utils v0.1.4
 	github.com/jkaninda/logger v0.0.5
 	github.com/jkaninda/okapi v0.11.0
