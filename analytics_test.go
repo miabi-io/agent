@@ -201,3 +201,35 @@ func TestEventPayload(t *testing.T) {
 		t.Error("empty payload reported as an event")
 	}
 }
+
+// The gateway's Redis is unreachable until the control plane joins the agent to the gateway
+// network, so a first failure must not end the forwarder: it used to log once and return, leaving
+// analytics silently absent until someone restarted the agent.
+func TestForwarderWaitsForAnUnreachableRedis(t *testing.T) {
+	f := NewForwarder(ForwarderConfig{
+		NodeSlug: "edge", Stream: "goma:analytics",
+		RedisAddr: "127.0.0.1:1", ControlURL: "http://127.0.0.1:1", Token: "t",
+		BatchSize: 10, Interval: 10 * time.Millisecond,
+	})
+	if f == nil {
+		t.Fatal("forwarder should be built from a full config")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { f.Run(ctx); close(done) }()
+
+	// It must still be retrying rather than having given up.
+	select {
+	case <-done:
+		t.Fatal("Run returned on an unreachable redis; it must keep retrying")
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not return after the context was cancelled")
+	}
+}

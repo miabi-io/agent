@@ -34,12 +34,13 @@ type ForwarderConfig struct {
 }
 
 const (
-	forwarderGroup     = "miabi-forwarder"
-	forwarderConsumer  = "agent"
-	defaultBatchSize   = 500
-	defaultInterval    = 5 * time.Second
-	forwarderBlock     = 5 * time.Second
-	forwarderMaxErrors = 5
+	forwarderGroup      = "miabi-forwarder"
+	forwarderConsumer   = "agent"
+	defaultBatchSize    = 500
+	defaultInterval     = 5 * time.Second
+	forwarderBlock      = 5 * time.Second
+	forwarderRetryDelay = 30 * time.Second
+	forwarderMaxErrors  = 5
 )
 
 // Forwarder drains the node gateway's local analytics stream and posts batches to
@@ -133,9 +134,19 @@ func NewForwarder(cfg ForwarderConfig) *Forwarder {
 // Run drains until ctx is cancelled. Failures are logged and retried: events stay
 // in the local stream, which is MAXLEN-capped, so an outage costs history, not disk.
 func (f *Forwarder) Run(ctx context.Context) {
-	if err := f.ensureGroup(ctx); err != nil {
-		logger.Warn("analytics forwarder could not start", "error", err)
-		return
+	for attempt := 0; ; attempt++ {
+		if ctx.Err() != nil {
+			return
+		}
+		err := f.ensureGroup(ctx)
+		if err == nil {
+			break
+		}
+
+		if attempt == 0 {
+			logger.Warn("analytics forwarder waiting for the gateway redis", "addr", f.cfg.RedisAddr, "error", err)
+		}
+		sleep(ctx, forwarderRetryDelay)
 	}
 	logger.Info("analytics forwarder started", "stream", f.cfg.Stream, "node", f.cfg.NodeSlug)
 
@@ -269,8 +280,11 @@ func sleep(ctx context.Context, d time.Duration) {
 }
 
 // startForwarder asks the control plane whether this node forwards analytics and
-// runs the forwarder if so. Env overrides let an operator pin it by hand. The
-// control plane may not be up yet, so it retries rather than giving up at boot.
+// runs the forwarder if so. Env overrides let an operator pin it by hand.
+//
+// It keeps asking. "Not forwarding" is the answer for a node that is not an edge gateway yet, and
+// a node is normally added first and given a gateway afterwards — so treating the first answer as
+// final meant analytics never started until the agent was restarted.
 func startForwarder(ctx context.Context, cfg Config) {
 	for attempt := 0; ctx.Err() == nil; attempt++ {
 		fc, err := FetchForwarderConfig(ctx, cfg)
@@ -282,12 +296,11 @@ func startForwarder(ctx context.Context, cfg Config) {
 			continue
 		}
 		applyForwarderEnv(&fc, cfg)
-		fwd := NewForwarder(fc)
-		if fwd == nil {
+		if fwd := NewForwarder(fc); fwd != nil {
+			fwd.Run(ctx) // returns only when ctx is cancelled
 			return
 		}
-		fwd.Run(ctx)
-		return
+		sleep(ctx, time.Minute)
 	}
 }
 
