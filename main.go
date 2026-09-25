@@ -14,6 +14,7 @@
 //	                                                       (env falls back to MIABI_API_URL)
 //	--token        / MIABI_NODE_TOKEN                  join token issued when the node was added (mbn_...)
 //	--insecure     / MIABI_AGENT_INSECURE_SKIP_VERIFY  skip TLS verification of the control plane (default false)
+//	                 MIABI_AGENT_STATS_INTERVAL        how often host CPU/memory is pushed (default 15s; 0 disables)
 //	                 DOCKER_HOST                       local Docker endpoint (default unix:///var/run/docker.sock)
 package main
 
@@ -65,6 +66,7 @@ func main() {
 	// On an edge-gateway node the local Goma writes request events to the node's
 	// own Redis, which no dashboard reads. Drain them to the control plane.
 	go startForwarder(ctx, cfg)
+	go startStatsPusher(ctx, cfg)
 
 	logger.Info("miabi-agent starting", "version", version, "control_url", cfg.ControlURL)
 	if err := Run(ctx, cfg); err != nil && err != context.Canceled {
