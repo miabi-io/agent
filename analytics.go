@@ -233,7 +233,7 @@ func (f *Forwarder) drainOnce(ctx context.Context) (int, error) {
 func (f *Forwarder) post(ctx context.Context, batchID string, events []json.RawMessage) error {
 	body := map[string]any{"batch_id": batchID, "events": events}
 	resp, err := f.api.Post("/api/v1/provider/" + f.cfg.NodeSlug + "/analytics").
-		WithContext(ctx).JSONBody(body).Do()
+		WithContext(ctx).Header("Idempotency-Key", batchID).JSONBody(body).Do()
 	if err != nil {
 		return err
 	}
