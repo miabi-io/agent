@@ -233,3 +233,34 @@ func TestForwarderWaitsForAnUnreachableRedis(t *testing.T) {
 		t.Fatal("Run did not return after the context was cancelled")
 	}
 }
+
+// The gateway redis keeps nothing on disk: a restart drops the stream and the consumer group, and Goma
+// writes into a fresh stream. The forwarder must recreate the group rather than fail with NOGROUP forever.
+func TestForwarderRecreatesGroupAfterRedisRestart(t *testing.T) {
+	posted := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Events []json.RawMessage `json:"events"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		posted += len(body.Events)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"data":{"accepted":1}}`))
+	}))
+	defer srv.Close()
+
+	f, mr := forwarderFor(t, srv)
+	mr.FlushAll() // the redis restarted
+	push(t, f, 2) // Goma writes into a new stream with no group
+
+	n, err := f.drainOnce(context.Background())
+	if err != nil {
+		t.Fatalf("drainOnce after the restart: %v", err)
+	}
+	if n != 2 || posted != 2 {
+		t.Fatalf("moved %d, posted %d; want the 2 events written after the restart", n, posted)
+	}
+	if p := pending(t, f); p != 0 {
+		t.Errorf("%d entries still pending", p)
+	}
+}
