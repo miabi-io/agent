@@ -180,13 +180,29 @@ func (f *Forwarder) ensureGroup(ctx context.Context) error {
 	return nil
 }
 
-// drainOnce forwards at most one batch and returns how many events it moved.
-func (f *Forwarder) drainOnce(ctx context.Context) (int, error) {
-	res, err := f.rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
+func (f *Forwarder) readBatch(ctx context.Context) ([]redis.XStream, error) {
+	return f.rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
 		Group: forwarderGroup, Consumer: forwarderConsumer,
 		Streams: []string{f.cfg.Stream, ">"},
 		Count:   int64(f.cfg.BatchSize), Block: forwarderBlock,
 	}).Result()
+}
+
+func isNoGroup(err error) bool {
+	return err != nil && strings.HasPrefix(err.Error(), "NOGROUP")
+}
+
+// drainOnce forwards at most one batch and returns how many events it moved.
+func (f *Forwarder) drainOnce(ctx context.Context) (int, error) {
+	res, err := f.readBatch(ctx)
+
+	if isNoGroup(err) {
+		logger.Info("analytics consumer group missing, recreating it (gateway redis restarted?)", "stream", f.cfg.Stream)
+		if gerr := f.ensureGroup(ctx); gerr != nil {
+			return 0, gerr
+		}
+		res, err = f.readBatch(ctx)
+	}
 	if errors.Is(err, redis.Nil) {
 		return 0, nil
 	}
@@ -232,7 +248,7 @@ func (f *Forwarder) drainOnce(ctx context.Context) (int, error) {
 // costs a replay — which the manager deduplicates on batch id.
 func (f *Forwarder) post(ctx context.Context, batchID string, events []json.RawMessage) error {
 	body := map[string]any{"batch_id": batchID, "events": events}
-	resp, err := f.api.Post("/api/v1/provider/" + f.cfg.NodeSlug + "/analytics").
+	resp, err := f.api.Post("/api/v1/provider/"+f.cfg.NodeSlug+"/analytics").
 		WithContext(ctx).Header("Idempotency-Key", batchID).JSONBody(body).Do()
 	if err != nil {
 		return err
