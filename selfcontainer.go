@@ -13,15 +13,7 @@ import (
 // containerIDRe is a 64-hex Docker/containerd container identifier.
 var containerIDRe = regexp.MustCompile(`[0-9a-f]{64}`)
 
-// selfContainerID returns the ID of the container the agent runs in, reported to
-// the control plane so the agent's own container is protected from being stopped
-// or deleted via the admin containers list. It returns "" when not in a container.
-//
-// Resolution order, most to least reliable: an explicit MIABI_CONTAINER_ID
-// override, the /var/lib/docker/containers/<id>/ bind-mount paths in
-// /proc/self/mountinfo, the cgroup path in /proc/self/cgroup, then the hostname
-// (Docker's default 12-char short ID). It mirrors the control plane's
-// internal/selfcontainer package, which the agent module cannot import.
+// Reported so the agent's own container is protected from the admin containers list; mirrors internal/selfcontainer.
 func selfContainerID() string {
 	if v := strings.TrimSpace(os.Getenv("MIABI_CONTAINER_ID")); v != "" {
 		return v

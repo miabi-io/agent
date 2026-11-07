@@ -18,13 +18,7 @@ type Identity struct {
 	SwarmNodeID string // this engine's id within the swarm; empty when not a member
 }
 
-// identity queries the local Docker daemon's /info over the same socket the agent
-// relays. It is deliberately hand-rolled rather than pulling in the Docker SDK: the
-// agent is a byte pump with three dependencies, and one JSON field is not worth a
-// module that would multiply its size.
-//
-// Best-effort by design. A failure here must never stop the agent connecting — it
-// only means the control plane learns a little less about this node.
+// Hand-rolled to avoid the Docker SDK; best-effort, a failure must never stop the agent connecting.
 func identity(ctx context.Context, dockerHost string) Identity {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -36,8 +30,7 @@ func identity(ctx context.Context, dockerHost string) Identity {
 			},
 		},
 	}
-	// The host in the URL is ignored — the dialer above decides where to connect —
-	// but it must be present and valid.
+	// The URL host is ignored (the dialer decides) but must be present and valid.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://docker/info", nil)
 	if err != nil {
 		return Identity{}

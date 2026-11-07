@@ -43,16 +43,13 @@ const (
 	forwarderMaxErrors  = 5
 )
 
-// Forwarder drains the node gateway's local analytics stream and posts batches to
-// the control plane, which appends them to the platform stream.
+// Forwarder drains the node gateway's local analytics stream and posts batches to the control plane.
 type Forwarder struct {
 	cfg ForwarderConfig
 	rdb *redis.Client
 	api *client.Client
 }
 
-// forwarderSettings is the control plane's answer to "should this node forward,
-// and from where" — resolved from the agent's own token.
 type forwarderSettings struct {
 	Enabled       bool   `json:"enabled"`
 	Node          string `json:"node"`
@@ -61,8 +58,7 @@ type forwarderSettings struct {
 	RedisPassword string `json:"redis_password"`
 }
 
-// FetchForwarderConfig asks the control plane how this node should forward. Env
-// overrides win, so an operator can still pin it by hand.
+// FetchForwarderConfig asks the control plane how this node should forward; env overrides win.
 func FetchForwarderConfig(ctx context.Context, cfg Config) (ForwarderConfig, error) {
 	tlsCfg, err := clientTLS(cfg)
 	if err != nil {
@@ -79,8 +75,7 @@ func FetchForwarderConfig(ctx context.Context, cfg Config) (ForwarderConfig, err
 	if err != nil {
 		return ForwarderConfig{}, err
 	}
-	// Without this a 401 would decode to an empty config and read as "forwarding
-	// is off for this node" rather than as a failure to retry.
+	// Without this a 401 would decode to an empty config and read as "forwarding off" instead of a retryable failure.
 	if err := resp.Error(); err != nil {
 		return ForwarderConfig{}, err
 	}
@@ -131,8 +126,7 @@ func NewForwarder(cfg ForwarderConfig) *Forwarder {
 	}
 }
 
-// Run drains until ctx is cancelled. Failures are logged and retried: events stay
-// in the local stream, which is MAXLEN-capped, so an outage costs history, not disk.
+// Run retries forever: events stay in the MAXLEN-capped local stream, so an outage costs history, not disk.
 func (f *Forwarder) Run(ctx context.Context) {
 	for attempt := 0; ; attempt++ {
 		if ctx.Err() != nil {
@@ -244,8 +238,7 @@ func (f *Forwarder) drainOnce(ctx context.Context) (int, error) {
 	return len(ids), f.ack(ctx, ids)
 }
 
-// post sends one batch. ACK happens only after this returns nil, so a lost reply
-// costs a replay — which the manager deduplicates on batch id.
+// ACK happens only after this returns nil; a lost reply costs a replay, which the manager dedupes on batch id.
 func (f *Forwarder) post(ctx context.Context, batchID string, events []json.RawMessage) error {
 	body := map[string]any{"batch_id": batchID, "events": events}
 	resp, err := f.api.Post("/api/v1/provider/"+f.cfg.NodeSlug+"/analytics").
@@ -253,8 +246,7 @@ func (f *Forwarder) post(ctx context.Context, batchID string, events []json.RawM
 	if err != nil {
 		return err
 	}
-	// Do reports transport failures only, so a non-2xx would otherwise read as
-	// success and the batch would be ACKed away.
+	// Do reports transport failures only, so a non-2xx would otherwise be ACKed away.
 	return resp.Error()
 }
 
@@ -262,8 +254,7 @@ func (f *Forwarder) ack(ctx context.Context, ids []string) error {
 	return f.rdb.XAck(ctx, f.cfg.Stream, forwarderGroup, ids...).Err()
 }
 
-// streamEventField is the field Goma writes each event under, and the only one
-// Miabi's consumer reads. Getting it wrong drops every event silently.
+// The only field Miabi's consumer reads; getting it wrong drops every event silently.
 const streamEventField = "e"
 
 // eventPayload pulls the JSON event out of a stream entry.
@@ -295,12 +286,7 @@ func sleep(ctx context.Context, d time.Duration) {
 	}
 }
 
-// startForwarder asks the control plane whether this node forwards analytics and
-// runs the forwarder if so. Env overrides let an operator pin it by hand.
-//
-// It keeps asking. "Not forwarding" is the answer for a node that is not an edge gateway yet, and
-// a node is normally added first and given a gateway afterwards — so treating the first answer as
-// final meant analytics never started until the agent was restarted.
+// Keeps asking: a node is often given a gateway after being added, so the first "no" isn't final.
 func startForwarder(ctx context.Context, cfg Config) {
 	for attempt := 0; ctx.Err() == nil; attempt++ {
 		fc, err := FetchForwarderConfig(ctx, cfg)

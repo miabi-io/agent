@@ -1,21 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Jonas Kaninda
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Command miabi-agent is the node-side runtime for Miabi multi-node.
-// It dials the control plane over an outbound WebSocket and pipes each tunnel
-// stream to the local Docker socket. All orchestration logic stays on the
-// control plane; the agent is a thin, dumb Docker proxy with no DB/Redis access.
-//
-// Configuration is read from flags, each defaulting to an environment variable so
-// the container form (env) and the binary form (flags) are interchangeable; a
-// flag wins when both are given.
-//
-//	--control-url  / MIABI_CONTROL_URL                 control plane base URL, e.g. https://miabi.example.com
-//	                                                       (env falls back to MIABI_API_URL)
-//	--token        / MIABI_NODE_TOKEN                  join token issued when the node was added (mbn_...)
-//	--insecure     / MIABI_AGENT_INSECURE_SKIP_VERIFY  skip TLS verification of the control plane (default false)
-//	                 MIABI_AGENT_STATS_INTERVAL        how often host CPU/memory is pushed (default 15s; 0 disables)
-//	                 DOCKER_HOST                       local Docker endpoint (default unix:///var/run/docker.sock)
+// Command miabi-agent pipes control-plane tunnel streams to the local Docker socket; flags override env vars.
 package main
 
 import (
@@ -63,8 +49,6 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// On an edge-gateway node the local Goma writes request events to the node's
-	// own Redis, which no dashboard reads. Drain them to the control plane.
 	go startForwarder(ctx, cfg)
 	go startStatsPusher(ctx, cfg)
 

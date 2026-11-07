@@ -86,8 +86,7 @@ func TestForwarderPostsAndAcks(t *testing.T) {
 	}
 }
 
-// The ACK must wait for the manager: a lost reply costs a replay, which the
-// manager deduplicates, but ACKing early would lose the events outright.
+// ACKing before the manager accepts would lose the events outright.
 func TestForwarderKeepsEventsWhenTheManagerFails(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
@@ -105,8 +104,7 @@ func TestForwarderKeepsEventsWhenTheManagerFails(t *testing.T) {
 	}
 }
 
-// A batch the manager will never accept has to be dropped, or it blocks every
-// event behind it forever.
+// A batch the manager will never accept must be dropped, or it blocks every event behind it.
 func TestForwarderDropsPermanentlyRejectedBatch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -202,9 +200,7 @@ func TestEventPayload(t *testing.T) {
 	}
 }
 
-// The gateway's Redis is unreachable until the control plane joins the agent to the gateway
-// network, so a first failure must not end the forwarder: it used to log once and return, leaving
-// analytics silently absent until someone restarted the agent.
+// Redis is unreachable until the agent joins the gateway network, so a first failure must not end the forwarder.
 func TestForwarderWaitsForAnUnreachableRedis(t *testing.T) {
 	f := NewForwarder(ForwarderConfig{
 		NodeSlug: "edge", Stream: "goma:analytics",
@@ -234,8 +230,7 @@ func TestForwarderWaitsForAnUnreachableRedis(t *testing.T) {
 	}
 }
 
-// The gateway redis keeps nothing on disk: a restart drops the stream and the consumer group, and Goma
-// writes into a fresh stream. The forwarder must recreate the group rather than fail with NOGROUP forever.
+// The gateway redis keeps nothing on disk, so the forwarder must recreate the group rather than fail with NOGROUP.
 func TestForwarderRecreatesGroupAfterRedisRestart(t *testing.T) {
 	posted := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

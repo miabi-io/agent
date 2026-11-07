@@ -29,10 +29,7 @@ type Config struct {
 
 const connectPath = "/api/v1/agent/connect"
 
-// Run connects to the control plane and serves Docker over the tunnel until ctx
-// is cancelled, reconnecting with exponential backoff. The WebSocket + yamux
-// transport (framing, keepalive, dial, reconnect loop) is the shared wstunnel
-// module, so the agent and control plane always speak the same wire protocol.
+// Run serves Docker over the tunnel until ctx is cancelled, reconnecting with exponential backoff.
 func Run(ctx context.Context, cfg Config) error {
 	header := http.Header{}
 	header.Set("Authorization", "Bearer "+cfg.Token)
@@ -63,9 +60,7 @@ func Run(ctx context.Context, cfg Config) error {
 			logger.Warn("agent disconnected", "error", err)
 		},
 	}
-	// Each accepted stream is one Docker API request the control plane opened;
-	// pipe it to the local Docker daemon. The handler blocks for the session's
-	// lifetime, so wstunnel.Serve reconnects when it returns.
+	// The handler blocks for the session's lifetime, so wstunnel.Serve reconnects when it returns.
 	return wstunnel.Serve(ctx, opts, func(_ context.Context, sess *yamux.Session) error {
 		for {
 			stream, err := sess.AcceptStream()

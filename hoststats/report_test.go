@@ -43,8 +43,7 @@ func TestSamplerMeasuresAcrossTheWholeInterval(t *testing.T) {
 	}
 }
 
-// A counter that went backwards must not be reported as an idle host: the sampler re-baselines and
-// reports nothing for that tick.
+// A backwards counter must not read as an idle host: re-baseline and report nothing that tick.
 func TestSamplerRebaselinesOnAWrappedCounter(t *testing.T) {
 	dir := t.TempDir()
 	s := &Sampler{ProcPath: dir}
