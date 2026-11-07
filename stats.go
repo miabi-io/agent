@@ -19,14 +19,10 @@ import (
 const (
 	statsPath            = "/api/v1/agent/stats"
 	defaultStatsInterval = 15 * time.Second
-	// statsRecheckInterval is how long to wait after the control plane said no (an older control
-	// plane without the endpoint, or a token it does not accept) before asking again.
 	statsRecheckInterval = 10 * time.Minute
 )
 
-// statsPusher reports this host's CPU and memory to the control plane, so the node is measured
-// without the control plane starting a helper container on it. /proc/stat and /proc/meminfo are
-// not namespaced, so the agent's own /proc is the host's.
+// /proc/stat and /proc/meminfo are not namespaced, so the agent's own /proc is the host's.
 type statsPusher struct {
 	cfg     Config
 	api     *client.Client

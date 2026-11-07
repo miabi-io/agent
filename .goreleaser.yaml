@@ -1,13 +1,4 @@
-# GoReleaser config for the Miabi node agent.
-#
-# The container image stays the primary way to run the agent (see Dockerfile and
-# install-agent.sh) — it is what the cluster-wide global service ships to every swarm
-# worker. These binaries are for the other case: running the agent as a host process
-# under systemd/launchd, on a node where you would rather not add a container to
-# supervise the containers.
-#
-# Release:  goreleaser release --clean   (on a tag)
-# Snapshot: goreleaser build --snapshot --clean
+# Binaries are for running the agent as a host process; the container image stays the primary form.
 version: 2
 
 project_name: miabi-agent
@@ -24,11 +15,7 @@ builds:
       - CGO_ENABLED=0
     flags:
       - -trimpath
-    # Linux and macOS only, and Windows is a deliberate omission rather than an
-    # oversight: the agent reaches Docker over `unix://` or `tcp://` (see dialDocker),
-    # and Windows serves its daemon on a named pipe (npipe://). A Windows binary would
-    # build cleanly and then fail to find Docker on every machine it ran on, which is
-    # worse than not shipping one.
+    # No Windows: the agent reaches Docker over unix:// or tcp://, and Windows serves its daemon on npipe://.
     goos: [linux, darwin]
     goarch: [amd64, arm64]
     ldflags:
